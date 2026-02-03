@@ -1,0 +1,51 @@
+[
+  {
+    "source": "demo",
+    "url": "local://sample",
+    "keyword": "patient records",
+    "snippet": "...T - Paste Site Finding\n\nDetected discussion about patient records breach.\nMentions of medical data exfiltration.\nRe...",
+    "collected_at": "2026-02-03T03:11:06.955389613Z"
+  },
+  {
+    "source": "demo",
+    "url": "local://sample",
+    "keyword": "medical data",
+    "snippet": "...cussion about patient records breach.\nMentions of medical data exfiltration.\nReferences to prescription database...",
+    "collected_at": "2026-02-03T03:11:06.955405775Z"
+  },
+  {
+    "source": "demo",
+    "url": "local://sample",
+    "keyword": "prescription",
+    "snippet": "...tions of medical data exfiltration.\nReferences to prescription database access.\n\nIOCs found:\n- IP: 45.33.32.156...",
+    "collected_at": "2026-02-03T03:11:06.955426513Z"
+  },
+  {
+    "source": "demo",
+    "url": "local://sample",
+    "ioc_type": "ipv4",
+    "ioc_value": "45.33.32.156",
+    "collected_at": "2026-02-03T03:11:06.955463899Z"
+  },
+  {
+    "source": "demo",
+    "url": "local://sample",
+    "ioc_type": "ipv4",
+    "ioc_value": "192.168.1.100",
+    "collected_at": "2026-02-03T03:11:06.955464094Z"
+  },
+  {
+    "source": "demo",
+    "url": "local://sample",
+    "ioc_type": "md5",
+    "ioc_value": "5d41402abc4b2a76b9719d911017c592",
+    "collected_at": "2026-02-03T03:11:06.955475874Z"
+  },
+  {
+    "source": "demo",
+    "url": "local://sample",
+    "ioc_type": "sha256",
+    "ioc_value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "collected_at": "2026-02-03T03:11:06.955483371Z"
+  }
+]
