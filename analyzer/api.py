@@ -1,15 +1,16 @@
 """
 ML Model API Server - serves ML models via FastAPI
-Allows SOAR playbooks, SIEM alerts, and other tools to call models in real-time
 """
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict, Optional, Any
+from typing import List, Optional
 import sys
 import os
+import json
+from pathlib import Path
+from collections import Counter
 
-# Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from analyzer.clustering import ThreatClusterer
@@ -26,14 +27,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Initialize models (loaded once at startup)
+# Initialize models
 clusterer = ThreatClusterer()
 anomaly_detector = AnomalyDetector(contamination=0.1)
 feature_engineer = FeatureEngineer()
 mitre_mapper = MITREMapper()
 deduplicator = IOCDeduplicator()
 
-# Lazy-load enricher and cross-reference (require API keys / data)
 _enricher = None
 _xref = None
 
@@ -50,10 +50,8 @@ def get_xref():
     return _xref
 
 
-# --- Request/Response Models ---
-
 class IOC(BaseModel):
-    type: str  # ipv4, domain, url, sha256, md5
+    type: str
     value: str
     source: Optional[str] = "api"
     threat_type: Optional[str] = None
@@ -81,21 +79,103 @@ class AnalyzeRequest(BaseModel):
     include_mitre: bool = True
 
 
-# --- Health Check ---
-
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
     return {"status": "healthy", "service": "HRTIP ML API"}
 
 
-# --- Enrichment Endpoints ---
+@app.get("/dashboard-data")
+async def get_dashboard_data():
+    """Get aggregated data for the dashboard"""
+    data_dir = Path("data")
+    
+    # Load collected IOCs from combined file
+    all_iocs = []
+    combined_files = sorted(data_dir.glob("iocs_*.json"), reverse=True)
+    
+    if combined_files:
+        with open(combined_files[0]) as f:
+            all_iocs = json.load(f)
+    
+    if not all_iocs:
+        return {"error": "No IOC data found. Run collectors first."}
+    
+    # Build feed status from IOC sources
+    source_counts = Counter(ioc.get("source") for ioc in all_iocs)
+    feed_status = {}
+    for source, count in source_counts.items():
+        feed_status[source or "unknown"] = {
+            "status": "active",
+            "last_run": all_iocs[0].get("collected_at") if all_iocs else None,
+            "iocs_collected": count
+        }
+    
+    # Process IOCs using correct method names
+    deduped = deduplicator.deduplicate(all_iocs)
+    mapped = mitre_mapper.map_multiple(deduped)
+    mitre_summary = mitre_mapper.generate_attack_summary(mapped)
+    
+    clustered = clusterer.cluster(mapped.copy(), eps=1.0, min_samples=2)
+    cluster_analysis = clusterer.analyze_clusters(clustered)
+    
+    anomaly_analysis = anomaly_detector.analyze_anomalies(mapped.copy())
+    features = feature_engineer.extract_all_features(mapped)
+    
+    # Build summary
+    sources = Counter(ioc.get("source") for ioc in mapped)
+    types = Counter(ioc.get("type") for ioc in mapped)
+    threats = Counter(ioc.get("threat_type") for ioc in mapped)
+    malware_counts = Counter(ioc.get("malware") for ioc in mapped if ioc.get("malware"))
+    
+    top_iocs = sorted(mapped, key=lambda x: x.get("confidence_score", 0), reverse=True)[:20]
+    
+    return {
+        "summary": {
+            "total_iocs": len(mapped),
+            "sources": dict(sources),
+            "ioc_types": dict(types),
+            "threat_types": dict(threats)
+        },
+        "top_iocs": [
+            {
+                "type": ioc.get("type"),
+                "value": ioc.get("value"),
+                "confidence_score": ioc.get("confidence_score"),
+                "malware": ioc.get("malware"),
+                "threat_type": ioc.get("threat_type"),
+                "sources": ioc.get("corroborated_by", [ioc.get("source")])
+            }
+            for ioc in top_iocs
+        ],
+        "mitre_summary": {
+            "total_iocs_mapped": mitre_summary.get("total_iocs_mapped", 0),
+            "unique_techniques": mitre_summary.get("unique_techniques", 0),
+            "unique_tactics": mitre_summary.get("unique_tactics", 0),
+            "kill_chain_coverage": features.get("ttp_features", {}).get("kill_chain_coverage", 0),
+            "top_techniques": mitre_summary.get("top_techniques", [])[:10],
+            "top_tactics": mitre_summary.get("top_tactics", [])[:10],
+            "malware_families": list(malware_counts.most_common(10))
+        },
+        "clusters": cluster_analysis.get("clusters", []),
+        "anomalies": {
+            "anomalies_found": anomaly_analysis.get("anomalies_found", 0),
+            "anomaly_rate": anomaly_analysis.get("anomaly_rate", 0),
+            "top_anomalies": [
+                {
+                    "value": a.get("value"),
+                    "type": a.get("type"),
+                    "score": a.get("anomaly", {}).get("anomaly_score", 0)
+                }
+                for a in anomaly_analysis.get("top_anomalies", [])[:5]
+            ]
+        },
+        "feeds": feed_status,
+        "temporal": features.get("temporal_features", {}),
+    }
+
 
 @app.post("/enrich")
 async def enrich_ioc(request: EnrichRequest):
-    """
-    Enrich a single IOC with threat intelligence
-    """
     try:
         enricher = get_enricher()
         ioc_dict = request.ioc.model_dump()
@@ -107,9 +187,6 @@ async def enrich_ioc(request: EnrichRequest):
 
 @app.post("/cross-reference")
 async def cross_reference_ioc(ioc: IOC):
-    """
-    Check if an IOC exists in collected threat feeds
-    """
     try:
         xref = get_xref()
         result = xref.check_ioc(ioc.type, ioc.value)
@@ -118,13 +195,8 @@ async def cross_reference_ioc(ioc: IOC):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- Scoring Endpoints ---
-
 @app.post("/score")
 async def score_ioc(ioc: IOC):
-    """
-    Calculate confidence score for an IOC
-    """
     try:
         scored = deduplicator.scorer.score_ioc(ioc.model_dump())
         return {
@@ -139,9 +211,6 @@ async def score_ioc(ioc: IOC):
 
 @app.post("/deduplicate")
 async def deduplicate_iocs(request: IOCList):
-    """
-    Deduplicate and score a list of IOCs
-    """
     try:
         ioc_dicts = [ioc.model_dump() for ioc in request.iocs]
         deduplicated = deduplicator.deduplicate(ioc_dicts)
@@ -155,13 +224,8 @@ async def deduplicate_iocs(request: IOCList):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- ML Analysis Endpoints ---
-
 @app.post("/cluster")
-async def cluster_iocs(request: IOCList):
-    """
-    Cluster IOCs into potential threat campaigns
-    """
+async def cluster_iocs_endpoint(request: IOCList):
     try:
         ioc_dicts = [ioc.model_dump() for ioc in request.iocs]
         clustered = clusterer.cluster(ioc_dicts, eps=1.0, min_samples=2)
@@ -177,9 +241,6 @@ async def cluster_iocs(request: IOCList):
 
 @app.post("/detect-anomalies")
 async def detect_anomalies(request: IOCList):
-    """
-    Detect anomalous IOCs using Isolation Forest
-    """
     try:
         ioc_dicts = [ioc.model_dump() for ioc in request.iocs]
         analysis = anomaly_detector.analyze_anomalies(ioc_dicts)
@@ -198,9 +259,6 @@ async def detect_anomalies(request: IOCList):
 
 @app.post("/extract-features")
 async def extract_features(request: IOCList):
-    """
-    Extract ML features from IOCs
-    """
     try:
         ioc_dicts = [ioc.model_dump() for ioc in request.iocs]
         features = feature_engineer.extract_all_features(ioc_dicts)
@@ -209,13 +267,8 @@ async def extract_features(request: IOCList):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- MITRE ATT&CK Endpoints ---
-
 @app.post("/map-mitre")
 async def map_to_mitre(request: IOCList):
-    """
-    Map IOCs to MITRE ATT&CK techniques
-    """
     try:
         ioc_dicts = [ioc.model_dump() for ioc in request.iocs]
         mapped = mitre_mapper.map_multiple(ioc_dicts)
@@ -229,13 +282,8 @@ async def map_to_mitre(request: IOCList):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# --- Full Analysis Pipeline ---
-
 @app.post("/analyze")
 async def full_analysis(request: AnalyzeRequest):
-    """
-    Run full analysis pipeline on IOCs
-    """
     try:
         ioc_dicts = [ioc.model_dump() for ioc in request.iocs]
         
@@ -244,23 +292,19 @@ async def full_analysis(request: AnalyzeRequest):
             "input_count": len(ioc_dicts)
         }
         
-        # Deduplicate and score
         deduplicated = deduplicator.deduplicate(ioc_dicts)
         result["deduplicated_count"] = len(deduplicated)
         result["dedup_stats"] = deduplicator.get_stats(ioc_dicts, deduplicated)
         
-        # MITRE mapping
         if request.include_mitre:
             mapped = mitre_mapper.map_multiple(deduplicated)
             result["mitre_summary"] = mitre_mapper.generate_attack_summary(mapped)
             deduplicated = mapped
         
-        # Clustering
         if request.include_clustering:
             clustered = clusterer.cluster(deduplicated.copy(), eps=1.0, min_samples=2)
             result["clustering"] = clusterer.analyze_clusters(clustered)
         
-        # Anomaly detection
         if request.include_anomaly_detection:
             anomaly_analysis = anomaly_detector.analyze_anomalies(deduplicated.copy())
             result["anomaly_detection"] = {
@@ -274,11 +318,9 @@ async def full_analysis(request: AnalyzeRequest):
                 "by_source": dict(anomaly_analysis["anomaly_by_source"])
             }
         
-        # Feature extraction
         if request.include_features:
             result["features"] = feature_engineer.extract_all_features(deduplicated)
         
-        # Top IOCs by confidence
         result["top_iocs"] = [
             {
                 "type": ioc.get("type"),
