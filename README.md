@@ -1,101 +1,201 @@
-# NEXUS - Threat Intelligence Platform
+# 🛡️ NEXUS - Cyber Threat Intelligence Platform
 
-A real-time cyber threat intelligence platform that aggregates, analyzes, and visualizes indicators of compromise (IOCs) from multiple threat feeds.
+A production-ready threat intelligence platform that aggregates, analyzes, and visualizes indicators of compromise (IOCs) from multiple open-source threat feeds using machine learning.
 
-🌐 **Live Demo**: [nexus-cti.vercel.app](https://nexus-cti.vercel.app)
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://nexus-cti.vercel.app)
+[![Python](https://img.shields.io/badge/python-3.9+-blue)](https://python.org)
+[![React](https://img.shields.io/badge/react-18-61dafb)](https://reactjs.org)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-![Dashboard Screenshot](dashboard/frontend/public/screenshot.png)
+🌐 **[Live Demo](https://nexus-cti.vercel.app)** | 📡 **[API](https://hrtip.onrender.com/health)**
 
-## Features
+---
 
-- **Real-time IOC Aggregation** - Collects threat data from 6+ feeds (URLhaus, ThreatFox, OpenPhish, AlienVault OTX, etc.)
-- **MITRE ATT&CK Mapping** - Automatically maps threats to ATT&CK techniques and tactics
-- **ML-Powered Analysis** - Clustering and anomaly detection to identify campaigns
-- **Interactive Dashboard** - Visualize threat landscape with charts and heatmaps
-- **IOC Database** - Searchable database with confidence scoring
+## ✨ Features
 
-## Tech Stack
+### 🔍 Multi-Source Threat Aggregation
+- **URLhaus** - Malicious URL database
+- **ThreatFox** - IOC sharing platform
+- **OpenPhish** - Phishing intelligence
+- **AlienVault OTX** - Open threat exchange
+- **Feodo Tracker** - Botnet C2 tracking
+- **MalwareBazaar** - Malware sample database
 
-**Frontend**
-- React + Vite
-- Tailwind CSS
-- Recharts
+### 🧠 Machine Learning Analysis
+- **Threat Clustering** - DBSCAN algorithm groups related IOCs into potential campaigns
+- **Anomaly Detection** - Isolation Forest identifies unusual patterns
+- **Confidence Scoring** - Multi-factor scoring with source corroboration
 
-**Backend**
-- Python + FastAPI
-- scikit-learn (ML)
-- STIX/TAXII support
+### 🎯 MITRE ATT&CK Integration
+- Automatic mapping of threats to ATT&CK techniques
+- Kill chain coverage visualization
+- Tactic-level heatmaps
 
-**Infrastructure**
-- Vercel (frontend)
-- Render (API)
-- Supabase (PostgreSQL)
+### 📊 Interactive Dashboard
+- Real-time threat landscape overview
+- IOC type distribution charts
+- Malware family tracking
+- 24-hour activity patterns
+- Searchable IOC database
 
-## Architecture
+---
+
+## 🖥️ Screenshots
+
+### Threat Overview Dashboard
+Real-time statistics showing 505+ IOCs from 6 active feeds, 79% ATT&CK coverage, and ML-detected anomalies.
+
+### MITRE ATT&CK Heatmap
+Visual kill chain coverage showing threat distribution across tactics and techniques.
+
+### Campaign Detection
+ML-powered clustering identifies related threat activity and potential coordinated campaigns.
+
+---
+
+## 🏗️ Architecture
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Threat    │────▶│   FastAPI   │────▶│  Supabase   │
-│   Feeds     │     │   Backend   │     │  Database   │
-└─────────────┘     └──────┬──────┘     └─────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                        THREAT FEEDS                            │
+│  URLhaus │ ThreatFox │ OpenPhish │ OTX │ Feodo │ MalwareBazaar │
+└─────────────────────────┬──────────────────────────────────────┘
                           │
                           ▼
-                   ┌─────────────┐
-                   │    React    │
-                   │  Dashboard  │
-                   └─────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     COLLECTOR LAYER                             │
+│  Feed Parsers → Normalizer → Deduplicator → Confidence Scorer  │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     ANALYSIS ENGINE                             │
+│  MITRE Mapper │ Threat Clusterer │ Anomaly Detector │ Enricher │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │
+                          ▼
+┌──────────────┐   ┌──────────────┐   ┌──────────────────────────┐
+│   Supabase   │◄──│   FastAPI    │──▶│     React Dashboard      │
+│  PostgreSQL  │   │   Backend    │   │  Vite + Tailwind + Charts│
+└──────────────┘   └──────────────┘   └──────────────────────────┘
 ```
 
-## Local Development
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | React 18, Vite, Tailwind CSS, Recharts, Lucide Icons |
+| **Backend** | Python 3.9+, FastAPI, Uvicorn |
+| **ML/Analysis** | scikit-learn (DBSCAN, Isolation Forest), pandas, NumPy |
+| **Database** | PostgreSQL (Supabase) |
+| **Threat Intel** | STIX/TAXII, Custom feed parsers |
+| **Deployment** | Vercel (frontend), Render (API), Supabase (DB) |
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.9+
 - Node.js 18+
-- Supabase account
+- Supabase account (free tier works)
 
-### Backend Setup
+### 1. Clone the Repository
 ```bash
-cd ~/projects/nexus
+git clone https://github.com/iojini/nexus.git
+cd nexus
+```
+
+### 2. Backend Setup
+```bash
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
+# Set environment variables
 export SUPABASE_URL="your-supabase-url"
-export SUPABASE_KEY="your-supabase-key"
+export SUPABASE_KEY="your-supabase-anon-key"
 
+# Collect threat data
+python -m collector.feed_manager
+
+# Start API server
 python -m analyzer.api
 ```
 
-### Frontend Setup
+### 3. Frontend Setup
 ```bash
 cd dashboard/frontend
 npm install
 npm run dev
 ```
 
-## API Endpoints
+Visit `http://localhost:5173` to view the dashboard.
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /health` | Health check |
-| `GET /stats` | Database statistics |
-| `GET /dashboard-data` | Aggregated dashboard data |
-| `POST /analyze` | Analyze IOC list |
+---
 
-## Screenshots
+## 📡 API Reference
 
-### Threat Overview
-Real-time stats, IOC distribution, and threat type breakdown.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/stats` | GET | Database statistics |
+| `/dashboard-data` | GET | Full dashboard payload |
+| `/analyze` | POST | Analyze custom IOC list |
 
-### MITRE ATT&CK Map
-Kill chain heatmap showing technique coverage.
+### Example Request
+```bash
+curl https://hrtip.onrender.com/dashboard-data | jq
+```
 
-### Campaigns
-ML-detected threat clusters and anomalies.
+---
 
-## License
+## 📁 Project Structure
+```
+nexus/
+├── analyzer/           # ML analysis engine
+│   ├── api.py         # FastAPI server
+│   ├── clustering.py  # DBSCAN threat clustering
+│   ├── anomaly_detector.py
+│   └── feature_engineering.py
+├── collector/          # Threat feed collectors
+│   ├── feed_manager.py
+│   └── feeds/         # Individual feed parsers
+├── processor/          # Data processing
+│   ├── mitre_mapper.py
+│   ├── scorer.py
+│   └── enricher.py
+├── integrations/       # SIEM/SOAR connectors
+├── reports/           # PDF report generator
+├── dashboard/
+│   └── frontend/      # React dashboard
+└── database.py        # Supabase client
+```
 
-MIT
+---
 
-## Author
+## 🔮 Future Enhancements
 
-Built by [Irene](https://github.com/iojini)
+- [ ] Historical trend analysis
+- [ ] Threat actor attribution
+- [ ] YARA rule generation
+- [ ] Slack/Teams alerting
+- [ ] Custom feed support
+- [ ] IOC export (STIX, CSV, JSON)
+
+---
+
+## 📄 License
+
+MIT License - feel free to use this project for learning or as a portfolio piece.
+
+---
+
+## 👤 Author
+
+**Irene** - [GitHub](https://github.com/iojini)
+
+---
+
+*Built with ☕ and a passion for cybersecurity*
