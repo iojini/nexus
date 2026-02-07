@@ -1,11 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { Shield, LayoutDashboard, Table, Grid3X3, Network, Radio } from 'lucide-react'
+import { Shield, LayoutDashboard, Grid3X3, Network, Table, Radio } from 'lucide-react'
 
 const navItems = [
   { path: '/', label: 'Overview', icon: LayoutDashboard },
-  { path: '/iocs', label: 'IOC Database', icon: Table },
   { path: '/attack-map', label: 'ATT&CK Map', icon: Grid3X3 },
   { path: '/campaigns', label: 'Campaigns', icon: Network },
+  { path: '/iocs', label: 'IOC Database', icon: Table },
   { path: '/feeds', label: 'Feed Status', icon: Radio },
 ]
 
