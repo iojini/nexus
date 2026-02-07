@@ -16,8 +16,8 @@ export default function Sidebar() {
         <div className="flex items-center gap-2">
           <Shield className="w-6 h-6 text-cyan-400" />
           <div>
-            <h1 className="text-sm font-bold text-white tracking-wide">HRTIP</h1>
-            <p className="text-[10px] text-gray-500 leading-tight">Healthcare & Retail<br/>Threat Intelligence</p>
+            <h1 className="text-sm font-bold text-white tracking-wide">NEXUS</h1>
+            <p className="text-[10px] text-gray-500 leading-tight">Threat Intelligence<br/>Platform</p>
           </div>
         </div>
       </div>

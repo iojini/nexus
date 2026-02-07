@@ -55,8 +55,8 @@ export default function Overview() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-white">Threat Landscape Overview</h1>
-          <p className="text-gray-400">Real-time threat intelligence from {Object.keys(summary.sources || {}).length} feeds</p>
+          <h1 className="text-2xl font-bold text-white">Threat Intelligence Overview</h1>
+          <p className="text-gray-400">Live data from {Object.keys(summary.sources || {}).length} feeds</p>
         </div>
         <div className="flex items-center gap-2 text-green-400">
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
