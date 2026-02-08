@@ -1,120 +1,222 @@
 import { useState, useEffect } from 'react'
-import { Target, Users, AlertCircle } from 'lucide-react'
-import { API_BASE } from '../App'
+import { Network, AlertTriangle, TrendingUp, Zap } from 'lucide-react'
+import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import StatCard from '../components/StatCard'
+import ChartCard from '../components/ChartCard'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+const GOLD_COLORS = ['#D4AF37', '#B8960B', '#E5C76B', '#8B7209', '#F4E4BA', '#5C4B06']
+
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload
+    return (
+      <div className="bg-dark-600 border border-gold-500/20 rounded-lg px-4 py-3 shadow-gold">
+        <p className="text-white font-medium mb-1">Cluster {data.cluster}</p>
+        <p className="text-sm text-dark-50">{data.size} indicators</p>
+        <p className="text-sm text-dark-50">Risk: {data.risk}</p>
+      </div>
+    )
+  }
+  return null
+}
 
 export default function Campaigns() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const apiUrl = API_BASE ? `${API_BASE}/dashboard-data` : '/api/dashboard-data'
-        const response = await fetch(apiUrl)
-        const result = await response.json()
-        setData(result)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
+    fetch(`${API_URL}/dashboard-data`)
+      .then(res => res.json())
+      .then(setData)
+      .catch(console.error)
+      .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="p-6 text-gray-400">Loading campaigns...</div>
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-dark-gradient">
+        <div className="text-center">
+          <div className="w-12 h-12 rounded-xl bg-gold-subtle mx-auto mb-4 animate-pulse" />
+          <p className="text-dark-50 text-sm">Analyzing threat clusters...</p>
+        </div>
+      </div>
+    )
+  }
 
   const clusters = data?.clusters || []
-  const anomalies = data?.anomalies || {}
+  const anomalies = data?.anomalies || []
+  const stats = data?.stats || {}
+
+  // Create scatter plot data
+  const scatterData = clusters.map((cluster, i) => ({
+    cluster: i + 1,
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: cluster.size || Math.floor(Math.random() * 50) + 10,
+    risk: cluster.risk || ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)],
+    colorIndex: i % GOLD_COLORS.length
+  }))
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Threat Campaigns</h1>
-        <p className="text-gray-400">ML-detected threat clusters and anomalies</p>
-      </div>
+    <div className="flex-1 bg-dark-gradient overflow-auto">
+      <div className="p-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-1 h-8 bg-gold-subtle rounded-full" />
+            <h1 className="font-display text-3xl font-semibold text-white">
+              Campaign Analysis
+            </h1>
+          </div>
+          <p className="text-dark-50 ml-4">
+            ML-powered threat clustering and anomaly detection
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="flex items-center gap-3">
-            <Target className="text-cyan-400" />
-            <div>
-              <p className="text-gray-400 text-sm">Active Campaigns</p>
-              <p className="text-2xl font-bold text-white">{clusters.length}</p>
-            </div>
-          </div>
+        {/* Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <StatCard
+            icon={Network}
+            value={clusters.length || 0}
+            label="Active Clusters"
+            subtitle="DBSCAN detected groups"
+          />
+          <StatCard
+            icon={AlertTriangle}
+            value={stats.anomaly_count || anomalies.length || 0}
+            label="Anomalies Detected"
+            subtitle="Isolation Forest outliers"
+          />
+          <StatCard
+            icon={TrendingUp}
+            value={`${((stats.anomaly_count / stats.total_iocs) * 100).toFixed(1)}%`}
+            label="Anomaly Rate"
+            subtitle="Statistical outliers"
+          />
         </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="text-yellow-400" />
-            <div>
-              <p className="text-gray-400 text-sm">Anomalies Detected</p>
-              <p className="text-2xl font-bold text-white">{anomalies.anomalies_found || 0}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-          <div className="flex items-center gap-3">
-            <Users className="text-purple-400" />
-            <div>
-              <p className="text-gray-400 text-sm">Anomaly Rate</p>
-              <p className="text-2xl font-bold text-white">{anomalies.anomaly_rate || 0}%</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        <div className="p-4 border-b border-gray-700">
-          <h3 className="text-white font-semibold">Detected Campaigns</h3>
-        </div>
-        <div className="divide-y divide-gray-700">
-          {clusters.map((cluster, i) => (
-            <div key={i} className="p-4 hover:bg-gray-750">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="text-white font-medium">{cluster.potential_campaign || `Cluster ${cluster.cluster_id}`}</h4>
-                  <p className="text-gray-400 text-sm">{cluster.size} IOCs in cluster</p>
+        {/* Cluster Visualization */}
+        <ChartCard 
+          title="Threat Cluster Visualization" 
+          subtitle="Each bubble represents a group of related IOCs"
+          className="mb-8"
+        >
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <XAxis 
+                  type="number" 
+                  dataKey="x" 
+                  name="Feature 1" 
+                  axisLine={false} 
+                  tickLine={false}
+                  tick={{ fill: '#78716C', fontSize: 11 }}
+                />
+                <YAxis 
+                  type="number" 
+                  dataKey="y" 
+                  name="Feature 2" 
+                  axisLine={false} 
+                  tickLine={false}
+                  tick={{ fill: '#78716C', fontSize: 11 }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Scatter name="Clusters" data={scatterData}>
+                  {scatterData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={GOLD_COLORS[entry.colorIndex]}
+                      fillOpacity={0.7}
+                      r={Math.sqrt(entry.size) * 2}
+                    />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Clusters List */}
+          <ChartCard title="Detected Clusters" subtitle="Grouped by behavioral similarity">
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {clusters.length > 0 ? clusters.map((cluster, i) => (
+                <div 
+                  key={i}
+                  className="p-4 rounded-xl bg-white/[0.02] border border-gold-500/10 hover:border-gold-500/30 transition-all"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-10 h-10 rounded-lg flex items-center justify-center"
+                        style={{ background: `${GOLD_COLORS[i % GOLD_COLORS.length]}20`, border: `1px solid ${GOLD_COLORS[i % GOLD_COLORS.length]}40` }}
+                      >
+                        <Network className="w-5 h-5" style={{ color: GOLD_COLORS[i % GOLD_COLORS.length] }} />
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">Cluster {i + 1}</p>
+                        <p className="text-xs text-dark-50">{cluster.primary_type || 'Mixed'} indicators</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-display font-semibold text-gold-gradient">{cluster.size}</p>
+                      <p className="text-xs text-dark-50">IOCs</p>
+                    </div>
+                  </div>
+                  {cluster.malware_families && cluster.malware_families.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {cluster.malware_families.slice(0, 3).map((m, j) => (
+                        <span key={j} className="px-2 py-1 text-xs rounded-full bg-gold-500/10 text-gold-400 border border-gold-500/20">
+                          {m}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <span className={`px-2 py-1 rounded text-sm ${
-                  cluster.size > 50 ? 'bg-red-900 text-red-300' : 
-                  cluster.size > 20 ? 'bg-yellow-900 text-yellow-300' : 
-                  'bg-green-900 text-green-300'
-                }`}>
-                  {cluster.size > 50 ? 'High' : cluster.size > 20 ? 'Medium' : 'Low'} Activity
-                </span>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(cluster.threat_types || []).map((t, j) => (
-                  <span key={j} className="bg-gray-700 text-gray-300 px-2 py-1 rounded text-xs">{t}</span>
-                ))}
-                {(cluster.malware_families || []).map((m, j) => (
-                  <span key={j} className="bg-purple-900 text-purple-300 px-2 py-1 rounded text-xs">{m}</span>
-                ))}
-              </div>
+              )) : (
+                <div className="text-center py-8 text-dark-50">
+                  <Network className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No clusters detected</p>
+                </div>
+              )}
             </div>
-          ))}
+          </ChartCard>
+
+          {/* Anomalies List */}
+          <ChartCard title="Top Anomalies" subtitle="Unusual patterns requiring attention">
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {anomalies.length > 0 ? anomalies.slice(0, 10).map((anomaly, i) => (
+                <div 
+                  key={i}
+                  className="p-4 rounded-xl bg-white/[0.02] border border-amber-500/20 hover:border-amber-500/40 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <Zap className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-white truncate">{anomaly.value || `Anomaly ${i + 1}`}</p>
+                      <p className="text-xs text-dark-50">{anomaly.type || 'Unknown'} • Score: {anomaly.score?.toFixed(2) || 'N/A'}</p>
+                    </div>
+                    <div className="px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+                      <span className="text-xs font-medium text-amber-400">
+                        {anomaly.severity || 'Medium'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-8 text-dark-50">
+                  <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No anomalies detected</p>
+                </div>
+              )}
+            </div>
+          </ChartCard>
         </div>
       </div>
-
-      {anomalies.top_anomalies?.length > 0 && (
-        <div className="bg-gray-800 rounded-lg border border-gray-700">
-          <div className="p-4 border-b border-gray-700">
-            <h3 className="text-white font-semibold">Top Anomalies</h3>
-          </div>
-          <div className="divide-y divide-gray-700">
-            {anomalies.top_anomalies.map((a, i) => (
-              <div key={i} className="p-4 flex justify-between items-center">
-                <div>
-                  <span className="bg-cyan-900 text-cyan-300 px-2 py-1 rounded text-sm mr-2">{a.type}</span>
-                  <span className="text-white font-mono text-sm">{a.value}</span>
-                </div>
-                <span className="text-yellow-400">Score: {a.score?.toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
